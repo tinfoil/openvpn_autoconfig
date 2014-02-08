@@ -5,7 +5,7 @@ apt-get update -q
 apt-get install -qy openvpn curl
 
 cd /etc/openvpn
-[ -f dh.pem ] || openssl dhparam -out dh.pem 512
+[ -f dh.pem ] || openssl dhparam -out dh.pem 4096
 
 [ -f ca-key.pem ] || openssl genrsa -out ca-key.pem 2048
 chmod 600 ca-key.pem

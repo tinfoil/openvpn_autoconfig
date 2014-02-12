@@ -2,7 +2,9 @@
 set -e
 
 apt-get update -q
-apt-get install -qy openvpn curl
+echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
+echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+apt-get install -qy openvpn curl iptables-persistent
 
 cd /etc/openvpn
 [ -f dh.pem ] || openssl dhparam -out dh.pem 2048
@@ -47,6 +49,7 @@ EOF
 echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf
 sysctl -w net.ipv4.ip_forward=1
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+iptables-save > /etc/iptables/rules.v4
 
 MY_IP_ADDR=$(curl -s http://myip.enix.org/REMOTE_ADDR)
 [ "$MY_IP_ADDR" ] || {

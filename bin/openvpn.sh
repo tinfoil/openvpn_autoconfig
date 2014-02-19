@@ -21,7 +21,7 @@ chmod 600 server-key.pem
 [ -f server-csr.pem ] || openssl req -new -key server-key.pem -out server-csr.pem -subj /CN=OpenVPN/
 [ -f cert.pem ] || openssl x509 -req -in server-csr.pem -out server-cert.pem -CA ca.pem -CAkey ca-key.pem -days 365
 
-[ -f udp80.conf ] || cat >udp80.conf <<EOF
+[ -f tcp443.conf ] || cat >tcp443.conf <<EOF
 server 10.8.0.0 255.255.255.0
 verb 3
 duplicate-cn
@@ -40,10 +40,10 @@ push "dhcp-option DNS 8.8.4.4"
 user nobody
 group nogroup
 
-proto udp
-port 80
-dev tun80
-status openvpn-status-80.log
+proto tcp
+port 443
+dev tun443
+status openvpn-status-443.log
 EOF
 
 echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf
@@ -69,7 +69,7 @@ client
 nobind
 dev tun
 redirect-gateway def1 bypass-dhcp
-remote $MY_IP_ADDR 80 udp
+remote $MY_IP_ADDR 443 tcp
 comp-lzo yes
 
 <key>

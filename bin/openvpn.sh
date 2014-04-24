@@ -7,7 +7,7 @@
 set -e
 
 if [[ $EUID -ne 0 ]]; then
-  echo "You must be a root user" 2>&1
+  echo "You must be a root user" 1>&2
   exit 1
 fi
 

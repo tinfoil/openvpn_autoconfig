@@ -49,7 +49,10 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
 >/etc/iptables/rules.v4 iptables-save
 
 # Write configuration files for client and server
->tcp80.conf cat <<EOF
+
+SERVER_IP=$(curl -s canhazip.com || echo "<insert server IP here>")
+
+>udp80.conf cat <<EOF
 server      10.8.0.0 255.255.255.0
 verb        3
 duplicate-cn
@@ -77,7 +80,7 @@ push        "route 0.0.0.0 0.0.0.0"
 user        nobody
 group       nogroup
 
-proto       tcp
+proto       udp
 port        80
 dev         tun80
 status      openvpn-status-80.log
@@ -88,7 +91,7 @@ client
 nobind
 dev tun
 redirect-gateway def1 bypass-dhcp
-remote $(curl -s canhazip.com) 80 tcp
+remote $SERVER_IP 80 udp
 comp-lzo yes
 
 <key>

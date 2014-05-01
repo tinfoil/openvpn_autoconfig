@@ -1,86 +1,110 @@
 #!/bin/sh
+#
+# Script to set up OpenVPN for routing all traffic.
+# Modified from Tinfoil Security's openvpn_autoconfig:
+# https://github.com/tinfoil/openvpn_autoconfig
+#
 set -e
 
+if [[ $EUID -ne 0 ]]; then
+  echo "You must be a root user" 1>&2
+  exit 1
+fi
+
 apt-get update -q
-echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
-echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+debconf-set-selections <<EOF
+iptables-persistent iptables-persistent/autosave_v4 boolean true
+iptables-persistent iptables-persistent/autosave_v6 boolean true
+EOF
 apt-get install -qy openvpn curl iptables-persistent
 
 cd /etc/openvpn
-[ -f dh.pem ] || openssl dhparam -out dh.pem 2048
 
-[ -f ca-key.pem ] || openssl genrsa -out ca-key.pem 2048
-chmod 600 ca-key.pem
-[ -f ca-csr.pem ] || openssl req -new -key ca-key.pem -out ca-csr.pem -subj /CN=OpenVPN-CA/
-[ -f ca.pem ] || openssl x509 -req -in ca-csr.pem -out ca.pem -signkey ca-key.pem -days 365
-[ -f ca.srl ] || echo 01 > ca.srl
+# Certificate Authority
+>ca-key.pem      openssl genrsa 2048
+>ca-csr.pem      openssl req -new -key ca-key.pem -subj /CN=OpenVPN-CA/
+>ca-cert.pem     openssl x509 -req -in ca-csr.pem -signkey ca-key.pem -days 365
+>ca-cert.srl     echo 01
 
-# Server Config
-[ -f server-key.pem ] || openssl genrsa -out server-key.pem 2048
-chmod 600 server-key.pem
-[ -f server-csr.pem ] || openssl req -new -key server-key.pem -out server-csr.pem -subj /CN=OpenVPN/
-[ -f cert.pem ] || openssl x509 -req -in server-csr.pem -out server-cert.pem -CA ca.pem -CAkey ca-key.pem -days 365
+# Server Key & Certificate
+>server-key.pem  openssl genrsa 2048
+>server-csr.pem  openssl req -new -key server-key.pem -subj /CN=OpenVPN-Server/
+>server-cert.pem openssl x509 -req -in server-csr.pem -CA ca-cert.pem -CAkey ca-key.pem -days 365
 
-[ -f udp80.conf ] || cat >udp80.conf <<EOF
-server 10.8.0.0 255.255.255.0
-verb 3
+# Client Key & Certificate
+>client-key.pem  openssl genrsa 2048
+>client-csr.pem  openssl req -new -key client-key.pem -subj /CN=OpenVPN-Client/
+>client-cert.pem openssl x509 -req -in client-csr.pem -CA ca-cert.pem -CAkey ca-key.pem -days 365
+
+# Diffie hellman parameters
+>dh.pem     openssl dhparam 2048
+
+chmod 600 *-key.pem
+
+# Set up IP forwarding and NAT for iptables
+>>/etc/sysctl.conf echo net.ipv4.ip_forward=1
+sysctl -p
+
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+>/etc/iptables/rules.v4 iptables-save
+
+# Write configuration files for client and server
+
+SERVER_IP=$(curl -s canhazip.com || echo "<insert server IP here>")
+
+>udp80.conf cat <<EOF
+server      10.8.0.0 255.255.255.0
+verb        3
 duplicate-cn
-key server-key.pem
-ca ca.pem
-cert server-cert.pem
-dh dh.pem
-keepalive 10 120
-persist-key
-persist-tun
-comp-lzo
-push "redirect-gateway def1 bypass-dhcp"
-push "dhcp-option DNS 8.8.8.8"
-push "dhcp-option DNS 8.8.4.4"
+key         server-key.pem
+ca          ca-cert.pem
+cert        server-cert.pem
+dh          dh.pem
+keepalive   10 120
+persist-key yes
+persist-tun yes
+comp-lzo    yes
+push        "dhcp-option DNS 8.8.8.8"
+push        "dhcp-option DNS 8.8.4.4"
 
-user nobody
-group nogroup
+# Normally, the following command is sufficient.
+# However, it doesn't assign a gateway when using 
+# VMware guest-only networking.
+#
+# push        "redirect-gateway def1 bypass-dhcp"
 
-proto udp
-port 80
-dev tun80
-status openvpn-status-80.log
+push        "redirect-gateway bypass-dhcp"
+push        "route-metric 512"
+push        "route 0.0.0.0 0.0.0.0"
+
+user        nobody
+group       nogroup
+
+proto       udp
+port        80
+dev         tun80
+status      openvpn-status-80.log
 EOF
 
-echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf
-sysctl -w net.ipv4.ip_forward=1
-iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
-iptables-save > /etc/iptables/rules.v4
-
-MY_IP_ADDR=$(curl -s http://myip.enix.org/REMOTE_ADDR)
-[ "$MY_IP_ADDR" ] || {
-    echo "Sorry, I could not figure out my public IP address."
-    echo "(I use http://myip.enix.org/REMOTE_ADDR/ for that purpose.)"
-    exit 1
-}
-
-# Client Config
-[ -f client-key.pem ] || openssl genrsa -out client-key.pem 2048
-chmod 600 client-key.pem
-[ -f client-csr.pem ] || openssl req -new -key client-key.pem -out client-csr.pem -subj /CN=OpenVPN-Client/
-[ -f client.pem ] || openssl x509 -req -in client-csr.pem -out client-cert.pem -CA ca.pem -CAkey ca-key.pem -days 365
-
-[ -f client.ovpn ] || cat >client.ovpn <<EOF
+>client.ovpn cat <<EOF
 client
 nobind
 dev tun
 redirect-gateway def1 bypass-dhcp
-remote $MY_IP_ADDR 80 udp
+remote $SERVER_IP 80 udp
 comp-lzo yes
 
 <key>
-`cat client-key.pem`
+$(cat client-key.pem)
 </key>
 <cert>
-`cat client-cert.pem`
+$(cat client-cert.pem)
 </cert>
 <ca>
-`cat ca.pem`
+$(cat ca-cert.pem)
 </ca>
 EOF
 
 service openvpn restart
+cat client.ovpn
+cd -

@@ -52,7 +52,7 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
 
 SERVER_IP=$(curl -s canhazip.com || echo "<insert server IP here>")
 
->udp80.conf cat <<EOF
+>tcp443.conf cat <<EOF
 server      10.8.0.0 255.255.255.0
 verb        3
 duplicate-cn
@@ -80,10 +80,10 @@ push        "route 0.0.0.0 0.0.0.0"
 user        nobody
 group       nogroup
 
-proto       udp
-port        80
-dev         tun80
-status      openvpn-status-80.log
+proto       tcp
+port        443
+dev         tun443
+status      openvpn-status-443.log
 EOF
 
 >client.ovpn cat <<EOF
@@ -91,7 +91,7 @@ client
 nobind
 dev tun
 redirect-gateway def1 bypass-dhcp
-remote $SERVER_IP 80 udp
+remote $SERVER_IP 443 tcp
 comp-lzo yes
 
 <key>

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Script to set up OpenVPN for routing all traffic.
 # Modified from Tinfoil Security's openvpn_autoconfig:

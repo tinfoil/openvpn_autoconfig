@@ -49,7 +49,7 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
 
 # Write configuration files for client and server
 
-SERVER_IP=$(curl -s canhazip.com || echo "<insert server IP here>")
+SERVER_IP=$(curl -s4 canhazip.com || echo "<insert server IP here>")
 
 >tcp443.conf cat <<EOF
 server      10.8.0.0 255.255.255.0

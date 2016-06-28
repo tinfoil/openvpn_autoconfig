@@ -51,6 +51,37 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
 
 SERVER_IP=$(curl -s4 canhazip.com || echo "<insert server IP here>")
 
+>udp80.conf cat <<EOF
+server      10.8.0.0 255.255.255.0
+verb        3
+duplicate-cn
+key         server-key.pem
+ca          ca-cert.pem
+cert        server-cert.pem
+dh          dh.pem
+keepalive   10 120
+persist-key yes
+persist-tun yes
+comp-lzo    yes
+push        "dhcp-option DNS 8.8.8.8"
+push        "dhcp-option DNS 8.8.4.4"
+# Normally, the following command is sufficient.
+# However, it doesn't assign a gateway when using
+# VMware guest-only networking.
+#
+# push        "redirect-gateway def1 bypass-dhcp"
+push        "redirect-gateway bypass-dhcp"
+push        "route-metric 512"
+push        "route 0.0.0.0 0.0.0.0"
+user        nobody
+group       nogroup
+proto       udp
+port        80
+dev         tun80
+status      openvpn-status-80.log
+EOF
+
+
 >tcp443.conf cat <<EOF
 server      10.8.0.0 255.255.255.0
 verb        3
@@ -67,7 +98,7 @@ push        "dhcp-option DNS 8.8.8.8"
 push        "dhcp-option DNS 8.8.4.4"
 
 # Normally, the following command is sufficient.
-# However, it doesn't assign a gateway when using 
+# However, it doesn't assign a gateway when using
 # VMware guest-only networking.
 #
 # push        "redirect-gateway def1 bypass-dhcp"

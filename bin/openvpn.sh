@@ -21,19 +21,19 @@ cd /etc/openvpn
 
 # Certificate Authority
 >ca-key.pem      openssl genrsa 2048
->ca-csr.pem      openssl req -new -key ca-key.pem -subj /CN=OpenVPN-CA/
->ca-cert.pem     openssl x509 -req -in ca-csr.pem -signkey ca-key.pem -days 365
+>ca-csr.pem      openssl req -sha256 -new -key ca-key.pem -subj /CN=OpenVPN-CA/
+>ca-cert.pem     openssl x509 -req -sha256 -in ca-csr.pem -signkey ca-key.pem -days 365
 >ca-cert.srl     echo 01
 
 # Server Key & Certificate
 >server-key.pem  openssl genrsa 2048
->server-csr.pem  openssl req -new -key server-key.pem -subj /CN=OpenVPN-Server/
->server-cert.pem openssl x509 -req -in server-csr.pem -CA ca-cert.pem -CAkey ca-key.pem -days 365
+>server-csr.pem  openssl req -sha256 -new -key server-key.pem -subj /CN=OpenVPN-Server/
+>server-cert.pem openssl x509 -sha256 -req -in server-csr.pem -CA ca-cert.pem -CAkey ca-key.pem -days 365
 
 # Client Key & Certificate
 >client-key.pem  openssl genrsa 2048
->client-csr.pem  openssl req -new -key client-key.pem -subj /CN=OpenVPN-Client/
->client-cert.pem openssl x509 -req -in client-csr.pem -CA ca-cert.pem -CAkey ca-key.pem -days 365
+>client-csr.pem  openssl req -sha256 -new -key client-key.pem -subj /CN=OpenVPN-Client/
+>client-cert.pem openssl x509 -req -sha256 -in client-csr.pem -CA ca-cert.pem -CAkey ca-key.pem -days 365
 
 # Diffie hellman parameters
 >dh.pem     openssl dhparam 2048

@@ -135,6 +135,19 @@ $(cat ca-cert.pem)
 </ca>
 EOF
 
-service openvpn restart
+VERSION=$(lsb_release -rs)
+case $VERSION in
+"12.04"|"14.04")
+  service openvpn restart
+  ;;
+"16.04")
+  systemctl restart openvpn@tcp443 && systemctl enable openvpn@tcp443
+  systemctl restart openvpn@udp80 && systemctl enable openvpn@udp80
+  ;;
+*)
+  echo "Sorry, this is an unsupported version of Ubuntu. Please restart the OpenVPN service or box manually."
+  ;;
+esac
+
 cat client.ovpn
 cd -
